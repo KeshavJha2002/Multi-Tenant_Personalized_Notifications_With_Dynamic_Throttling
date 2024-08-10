@@ -70,9 +70,9 @@ Your task is to design, implement, and deploy this extended notification system 
 
 #### 2) **Latency:**
 
-- **Email:** < 300ms avg, 95% within 500ms.
-- **SMS:** < 150ms avg, 95% within 300ms.
-- **In-App:** < 50ms avg, 99% within 100ms.
+- **Email:** < 100ms avg, 95% within 200ms.
+- **SMS:** < 50ms avg, 95% within 100ms.
+- **In-App:** < 20ms avg, 99% within 50ms.
 
 #### 3) **Scalability:** 
 
