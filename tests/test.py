@@ -8,6 +8,9 @@ from utilities import (
     generate_data_for_send_friend_req_ack,
     generate_data_for_mention
 )
+import threading
+import time
+from random import choice
 
 BASE_URL = "http://127.0.0.1:8000"
 
@@ -46,12 +49,45 @@ def test_mention():
     data = generate_data_for_mention()
     requests.post(url, data=data)
 
+test_functions = [
+    test_like_post,
+    test_like_comment,
+    test_comment_post,
+    test_comment_comment,
+    test_send_friend_req,
+    test_send_friend_req_ack,
+    test_mention
+]
+
+# def worker():
+#     while True:
+#         func = choice(test_functions)  # Randomly select a test function
+#         func()
+#         time.sleep(1)  # Sleep to prevent overwhelming the server with requests
+
+# def main():
+#     threads = []
+#     try:
+#         # Create and start 100 threads
+#         for _ in range(100):
+#             t = threading.Thread(target=worker)
+#             t.daemon = True  # Daemonize thread to ensure it exits when the main program exits
+#             t.start()
+#             threads.append(t)
+            
+#         for t in threads:
+#             t.join()
+#     except KeyboardInterrupt:
+#         print("Interrupted by user. Stopping threads...")
+
+def main():
+    test_like_post()
+    test_like_comment()
+    # test_comment_post()
+    # test_comment_comment()
+    # test_send_friend_req()
+    # test_send_friend_req_ack()
+    # test_mention()
+
 if __name__ == "__main__":
-    for _ in range(2): 
-        test_like_post()
-        test_like_comment()
-        test_comment_post()
-        test_comment_comment()
-        test_send_friend_req()
-        test_send_friend_req_ack()
-        test_mention()
+    main()

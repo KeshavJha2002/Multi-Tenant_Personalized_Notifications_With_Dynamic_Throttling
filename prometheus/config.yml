@@ -1,0 +1,32 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: ['172.30.199.134:9100']
+
+  - job_name: 'kafka-broker-1'
+    static_configs:
+      - targets: ['172.30.199.134:9092']
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['172.30.199.134:6379']
+
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['172.30.199.134:5432']
+
+  - job_name: 'fastapi'
+    static_configs:
+      - targets: ['172.30.199.134:8000']
+
+  - job_name: 'kafka-exporter'
+    static_configs:
+      - targets: ['172.30.199.134:9308']
+

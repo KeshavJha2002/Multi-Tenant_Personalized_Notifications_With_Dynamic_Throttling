@@ -76,7 +76,7 @@ Simulating the notification system of a social media platform.
 
 ```json
 {
-  "type": "COMMENT",
+  "action_type": "COMMENT",
   "action_data": "",
   "action_on": "POST||COMMENT",
   "action_on_id": "POST_ID||COMMENT_ID",
@@ -92,7 +92,7 @@ Simulating the notification system of a social media platform.
 
 ```json
 {
-  "type": "FRIEND_REQ",
+  "action_type": "FRIEND_REQ",
   "action_by": "USER_ID",
   "action_on": "USER_ID",
   "action_at": "timestamp"

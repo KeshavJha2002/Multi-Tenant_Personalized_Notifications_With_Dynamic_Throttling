@@ -108,6 +108,8 @@ def generate_data_for_send_friend_req_ack():
   }
   return json.dumps(data)
 
+
+
 def generate_data_for_mention():
   action_types = ["POST", "COMMENT", "CONVERSATION"]
   action_type = "MENTION"
