@@ -65,6 +65,7 @@ Simulating the notification system of a social media platform.
   "action_on": "POST||COMMENT",
   "action_on_id": "POST_ID||COMMENT_ID",
   "action_by": "USER_ID",
+  "action_to": "USER_ID",
   "action_at": "timestamp"
 }
 ```
@@ -80,6 +81,7 @@ Simulating the notification system of a social media platform.
   "action_on": "POST||COMMENT",
   "action_on_id": "POST_ID||COMMENT_ID",
   "action_by": "USER_ID",
+  "action_to": "USER_ID",
   "action_at": "timestamp"
 }
 ```
@@ -120,6 +122,7 @@ Simulating the notification system of a social media platform.
   "action_on": "POST||COMMENT||CONVERSATION",
   "action_on_id": "POST_ID||COMMENT_ID||CONVERSATION_ID",
   "action_by": "USER_ID",
+  "action_to": "USER_ID",
   "action_at": "timestamp"
 }
 ```
@@ -191,9 +194,3 @@ In case of multiple hits, say (comment_id => [] &&  action_by_user_id=> []) then
 - Cpu usage
 - Consumer lag
 - Bundling rate
-
-
-
-
-
-
