@@ -100,7 +100,7 @@ docker run -d --name backend-notif-system \
   notification-backend:latest
 ```
 
-Or use the convenience script:
+Or use the convenience script (1+2):
 
 ```bash
 ./start.sh
@@ -174,6 +174,39 @@ python tests/load_test_client.py -t 10 -n 100 --api-url http://localhost:8000
 | `-u` | User range (min,max) | 1,10000 |
 | `-p` | Post range (min,max) | 1,1000 |
 
+**Example Run:**
+
+```bash
+docker exec backend-notif-system python tests/load_test_client.py -t 10 -n 10000
+```
+
+**Output:**
+
+```
+Starting load test: threads=10, requests_per_thread=10000, rps=0, like_ratio=0.7
+User range: (1, 10000), Post range: (1, 1000)
+API: http://localhost:8000
+------------------------------------------------------------
+------------------------------------------------------------
+Load test complete
+Elapsed time: 319.13s
+Throughput: 313.35 req/s
+
+Results:
+  Total requests:  100000
+  Success:         100000
+  Failures:        0
+  Success rate:    100.0%
+  Avg latency:     29.74ms
+  P50 latency:     27.42ms
+  P95 latency:     45.08ms
+```
+
+**Performance Notes:**
+- 313 req/s throughput with single Kafka broker
+- 100% success rate under load
+- P95 latency under 50ms
+
 ---
 
 ## Configuration
@@ -216,6 +249,18 @@ Created automatically on startup:
 | Prometheus | http://localhost:9090 |
 | Grafana | http://localhost:3001 (admin/admin) |
 | Loki (logs) | http://localhost:3100 |
+
+### Grafana Setup
+
+1. Go to `http://localhost:3001` (login: admin/admin)
+2. **Configuration** → **Data Sources** → **Add data source**
+3. Select **Prometheus**
+4. URL: `http://prometheus-notif-system:9090`
+5. Save
+
+Now create dashboards using PromQL queries like:
+- `api_requests_total` - total requests
+- `api_request_latency_seconds_bucket` - latency histogram
 
 ---
 

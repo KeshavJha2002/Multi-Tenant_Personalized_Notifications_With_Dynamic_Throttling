@@ -28,4 +28,12 @@ sleep 2
 echo "All services started!"
 echo "API: http://localhost:8000"
 
-tail -f /dev/null
+# Keep container running - monitor background processes
+while true; do
+    sleep 5
+    # Check if uvicorn is still running
+    if ! pgrep -f "uvicorn" > /dev/null; then
+        echo "ERROR: uvicorn stopped, restarting..."
+        nohup python -m uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &
+    fi
+done

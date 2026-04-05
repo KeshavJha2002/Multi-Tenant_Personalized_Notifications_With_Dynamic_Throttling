@@ -4,8 +4,16 @@ set -e
 echo "Starting infrastructure services..."
 docker-compose up -d zookeeper kafka-broker-1 postgres redis prometheus grafana loki node-exporter redis-exporter postgres-exporter
 
+echo "Waiting for Kafka..."
+sleep 15
+
+echo "Creating Kafka topics..."
+docker exec kafka-broker-1 kafka-topics.sh --create --topic likes --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1 2>/dev/null || true
+docker exec kafka-broker-1 kafka-topics.sh --create --topic comments --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1 2>/dev/null || true
+docker exec kafka-broker-1 kafka-topics.sh --list --bootstrap-server localhost:9092
+
 echo "Waiting for PostgreSQL..."
-sleep 10
+sleep 5
 
 echo "Starting backend..."
 docker rm -f backend-notif-system 2>/dev/null || true
@@ -20,7 +28,7 @@ docker run -d --name backend-notif-system \
     -e LIKES_TOPIC=likes \
     -e COMMENTS_TOPIC=comments \
     -p 8000:8000 \
-    multi-tenant_personalized_notifications_with_dynamic_throttling_backend:test
+    multi-tenant_personalized_notifications_with_dynamic_throttling_backend:fixed
 
 echo "All services started!"
 docker ps --format "table {{.Names}}\t{{.Status}}"
