@@ -1,4 +1,4 @@
-# Multi-Tenant Notification System with Dynamic Throttling
+# Notification System with Kafka and Logarithmic Batching
 
 A high-throughput notification pipeline that handles likes and comments on posts, decouples ingestion from persistence using Kafka, and delivers batched notifications using a logarithmic sliding window strategy.
 
