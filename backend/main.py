@@ -1,107 +1,84 @@
-from fastapi import FastAPI, Request, Response
-from producers import producer_for_networking_topic, producer_for_comment_topic, producer_for_like_topic, producer_for_mention_topic
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+import os
+import uuid
+import logging
 import time
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import PlainTextResponse
+from prometheus_client import Counter, Histogram, generate_latest
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from models import LikeRequest, CommentRequest
+from producers import produce_like, produce_comment
 
-app = FastAPI()
+logger = logging.getLogger(__name__)
 
-instrumentator = Instrumentator()
-instrumentator.instrument(app).expose(app, endpoint="/metrics")
+REQUEST_COUNT = Counter(
+    "api_requests_total", "Total API requests", ["endpoint", "method"]
+)
+REQUEST_LATENCY = Histogram(
+    "api_request_latency_seconds", "API request latency", ["endpoint"]
+)
 
-REQUEST_COUNT = Counter('api_requests_total', 'Total API requests')
-REQUEST_LATENCY = Histogram('api_request_latency_seconds', 'API request latency')
-@app.get('/')
-async def root():
-  return {"message": "Hello"}
 
-@app.route('/metrics')
-def metrics(request: Request):
-    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Notification API starting up")
+    yield
+    logger.info("Notification API shutting down")
 
-# b'{"action_type": "LIKE", "action_on": "POST", "action_on_id": "post_779751", "action_by": "user_6041", "action_to": "user_2979", "action_at": 1723960628688}'
-@app.post('/api/like_post')
-async def root(request: Request):
-  try:
-    REQUEST_COUNT.inc()
-    start_time = time.time()
-    body = await request.json()
-    # print(body)
-    await producer_for_like_topic(body)
-  except Exception as e:
-    return {"error": str(e)}
-  finally:
-    REQUEST_LATENCY.observe(time.time() - start_time)
 
-@app.post('/api/like_comment')
-async def root(request: Request):
-  try:
-    REQUEST_COUNT.inc()
-    start_time = time.time()
-    body = await request.json()
-    await producer_for_like_topic(body)
-  except Exception as e:
-    return {"error": str(e)}
-  finally:
-    REQUEST_LATENCY.observe(time.time() - start_time)
+app = FastAPI(
+    title="Notification System API",
+    description="Ingestion layer for like and comment events",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
-@app.post('/api/comment_post')
-async def root(request: Request):
-    REQUEST_COUNT.inc()
-    start_time = time.time()
+Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
+@app.get("/metrics")
+async def metrics():
+    return PlainTextResponse(generate_latest())
+
+
+@app.post("/like", status_code=202)
+async def create_like(body: LikeRequest):
+    start = time.time()
     try:
-        body = await request.json()
-        await producer_for_comment_topic(body)
+        REQUEST_COUNT.labels(endpoint="/like", method="POST").inc()
+        event_id = str(uuid.uuid4())
+        produce_like(user_id=body.user_id, post_id=body.post_id, event_id=event_id)
+        return {"event_id": event_id, "status": "accepted"}
     except Exception as e:
-        return {"error": str(e)}
+        logger.error("Failed to produce like event: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
-        REQUEST_LATENCY.observe(time.time() - start_time)
+        REQUEST_LATENCY.labels(endpoint="/like").observe(time.time() - start)
 
-@app.post('/api/comment_comment')
-async def root(request: Request):
-  try:
-    REQUEST_COUNT.inc()
-    start_time = time.time()
-    body = await request.json()
-    await producer_for_comment_topic(body)
-  except Exception as e:
-    return {"error": str(e)}
-  finally:
-    REQUEST_LATENCY.observe(time.time() - start_time)
 
-@app.post('/api/send_friend_req')
-async def root(request: Request):
-  try:
-    REQUEST_COUNT.inc()
-    start_time = time.time()
-    body = await request.json()
-    await producer_for_networking_topic(body)
-  except Exception as e:
-    return {"error": str(e)}
-  finally:
-    REQUEST_LATENCY.observe(time.time() - start_time)
-
-@app.post('/api/send_friend_req_ack')
-async def root(request: Request):
-  try:
-    REQUEST_COUNT.inc()
-    start_time = time.time()
-    body = await request.json()
-    await producer_for_networking_topic(body)
-  except Exception as e:
-    return {"error": str(e)}
-  finally:
-    REQUEST_LATENCY.observe(time.time() - start_time)
-
-@app.post('/api/mention')
-async def root(request: Request):
-  try:
-    REQUEST_COUNT.inc()
-    start_time = time.time()
-    body = await request.json()
-    await producer_for_mention_topic(body)
-  except Exception as e:
-    return {"error": str(e)}
-  finally:
-    REQUEST_LATENCY.observe(time.time() - start_time)
+@app.post("/comment", status_code=202)
+async def create_comment(body: CommentRequest):
+    start = time.time()
+    try:
+        REQUEST_COUNT.labels(endpoint="/comment", method="POST").inc()
+        event_id = str(uuid.uuid4())
+        produce_comment(
+            user_id=body.user_id,
+            post_id=body.post_id,
+            content=body.content,
+            event_id=event_id,
+        )
+        return {"event_id": event_id, "status": "accepted"}
+    except Exception as e:
+        logger.error("Failed to produce comment event: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        REQUEST_LATENCY.labels(endpoint="/comment").observe(time.time() - start)

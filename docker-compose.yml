@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # Zookeeper Service
   zookeeper:
     image: bitnami/zookeeper:latest
     container_name: zookeeper-notif-system
@@ -9,10 +8,12 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
       ALLOW_ANONYMOUS_LOGIN: "yes"
+      ZOOKEEPER_4LW_COMMANDS_WHITELIST: ruok
     ports:
       - "2181:2181"
+    networks:
+      - monitoring
 
-  # Kafka Broker 1
   kafka-broker-1:
     image: bitnami/kafka:latest
     container_name: kafka-broker-1
@@ -26,68 +27,55 @@ services:
       - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
       - KAFKA_LISTENER_NAME=INSIDE
       - KAFKA_INTER_BROKER_LISTENER_NAME=INSIDE
-      - KAFKA_MESSAGE_MAX_BYTES=200000000
-      - KAFKA_REPLICA_FETCH_MAX_BYTES=200000000
-      - KAFKA_MAX_PARTITION_FETCH_BYTES=200000000
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_CFG_DELETE_TOPIC_ENABLE=true
     ports:
       - "9092:9092"
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-1 kafka-broker-1 9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
 
-  # # Kafka Broker 2
-  # kafka-broker-2:
-  #   image: bitnami/kafka:latest
-  #   container_name: kafka-broker-2
-  #   depends_on:
-  #     - zookeeper
-  #   environment:
-  #     - KAFKA_BROKER_ID=2
-  #     - KAFKA_ADVERTISED_LISTENERS=INSIDE://kafka-broker-2:9094,OUTSIDE://localhost:9093
-  #     - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
-  #     - KAFKA_LISTENERS=INSIDE://0.0.0.0:9094,OUTSIDE://0.0.0.0:9093
-  #     - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
-  #     - KAFKA_LISTENER_NAME=INSIDE
-  #     - KAFKA_INTER_BROKER_LISTENER_NAME=INSIDE
-  #     - KAFKA_MESSAGE_MAX_BYTES=200000000
-  #     - KAFKA_REPLICA_FETCH_MAX_BYTES=200000000
-  #     - KAFKA_MAX_PARTITION_FETCH_BYTES=200000000
-  #   ports:
-  #     - "9093:9093"
-
-  # Redis
   redis:
     image: redis:latest
+    container_name: redis-notif-system
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
     networks:
       - monitoring
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # PostgreSQL
   postgres:
     image: postgres:latest
+    container_name: postgres-notif-system
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: notification_system_users
     ports:
-      - "5431:5431"
+      - "5431:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
       - monitoring
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Node Exporter
-  node-exporter:
-    image: prom/node-exporter:latest
-    ports:
-      - "9100:9100"
-    networks:
-      - monitoring
-
-  # Prometheus
   prometheus:
     image: prom/prometheus:latest
-    container_name: prometheusnotif-system
+    container_name: prometheus-notif-system
     volumes:
       - ./prometheus/config.yml:/etc/prometheus/prometheus.yml
     command:
@@ -97,20 +85,20 @@ services:
     networks:
       - monitoring
     depends_on:
-      - node-exporter
       - kafka-broker-1
-      # - kafka-broker-2
       - redis
       - postgres
+      - node-exporter
+      - redis-exporter
+      - postgres-exporter
 
-  # Grafana
   grafana:
     image: grafana/grafana:latest
     container_name: grafana-notif-system
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
       - grafana-data:/var/lib/grafana
     depends_on:
@@ -119,7 +107,6 @@ services:
     networks:
       - monitoring
 
-  # Loki
   loki:
     image: grafana/loki:2.7.1
     container_name: loki-notif-system
@@ -132,10 +119,9 @@ services:
     networks:
       - monitoring
 
-  # Redis Exporter
   redis-exporter:
     image: bitnami/redis-exporter:latest
-    container_name: redis-container
+    container_name: redis-exporter-notif-system
     environment:
       REDIS_ADDR: redis:6379
     ports:
@@ -145,19 +131,47 @@ services:
     networks:
       - monitoring
 
-  # Kafka Exporter
-  # kafka-exporter:
-  #   image: danielqsj/kafka-exporter:latest
-  #   container_name: kafka-exporter
-  #   ports:
-  #     - "9308:9308"
-  #   environment:
-  #     KAFKA_BROKERS: kafka-broker-1:9092,kafka-broker-2:9094
-  #   depends_on:
-  #     - kafka-broker-1
-  #     - kafka-broker-2
-  #   networks:
-  #     - monitoring
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter-notif-system
+    ports:
+      - "9100:9100"
+    networks:
+      - monitoring
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter-notif-system
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:postgres@postgres-notif-system:5432/postgres"
+    ports:
+      - "9187:9187"
+    depends_on:
+      - postgres
+    networks:
+      - monitoring
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: backend-notif-system
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=notification_system_users
+      - KAFKA_BROKER=kafka-broker-1:9093
+      - LIKES_TOPIC=likes
+      - COMMENTS_TOPIC=comments
+    ports:
+      - "8000:8000"
+    depends_on:
+      - kafka-broker-1
+      - postgres
+    networks:
+      - monitoring
 
 volumes:
   pgdata:
@@ -167,6 +181,3 @@ volumes:
 networks:
   monitoring:
     driver: bridge
-
-
-# docker run -ti --rm -p 9308:9308 danielqsj/kafka-exporter --kafka.server=kafka:9092 [--kafka.server=another-server ...]
